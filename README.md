@@ -223,30 +223,11 @@ sections from other towns.
 
 ## How I Used AI
 
-**1. Reading the corpus before touching the chunker.** I asked Claude to read
-four of the guides (`guide_kestrelford.md`, `guide_seasons.md`,
-`guide_regional_transport.md`, `guide_eating.md`) and tell me what the
-starter's 800-character windows were doing to documents shaped like that. What
-came back was the baseline line — 51 chunks from 14 documents, shortest 24
-characters — and one thing I had not spotted: nine of the fourteen guides have
-a section headed "Eat and drink", so the body of that section on its own
-doesn't say which town it belongs to. I changed my plan because of that. The
-chunker I'd sketched just split on `##` and kept the body; the version I
-actually wrote puts `Town — Heading` on the first line of every chunk, so the
-town name gets embedded along with the text.
+I used Claude as a coding assistant — for scaffolding, for the git commits, and for debugging — but I read every line before it went in, wrote a lot of the chunker myself, and kept the design decisions with me.
 
-**2. Writing the section splitter, then checking its claims.** I gave Claude my
-three rules — split on `##`, merge anything under 200 characters into its
-neighbour, cap a chunk at 1,200 — and asked it to write `split_documents`. The
-code was right, but its docstring asserted that "only three sections in
-city_guides are long enough" to need splitting at the 900-character ceiling. I
-checked that instead of believing it, and the real number is zero: the longest
-section body in this corpus is 691 characters, so `_split_long` never fires and
-my 150-character overlap does nothing here at all. I fixed the comment rather
-than the code — the ceiling still has to hold for criterion 4 — and the finding
-went into the Chunking Strategy section above, because an overlap that never
-runs is worth knowing about before unit 2, when I'd otherwise be tuning a
-number that has no effect.
+**1.** I asked it what the starter's 800-character windows were doing to documents shaped like these, and it came back with the baseline (51 chunks, shortest 24 characters) plus one thing I'd missed: nine of my fourteen guides have a section headed "Eat and drink", so that section's body alone never says which town it belongs to. That changed my plan — I added the `Town — Heading` line to the top of every chunk so the town name gets embedded too.
+
+**2.** I gave it my three rules (split on `##`, merge under 200, cap at 1,200) and had it draft `split_documents`. The code was right but its docstring claimed three sections were long enough to need splitting; I checked and the real number is zero — the longest section here is 691 characters, so my 150-character overlap never fires at all. I fixed the comment rather than the code and put the finding in Chunking Strategy above, since an overlap that does nothing is worth knowing before I start tuning numbers in unit 2.
 
 <!-- No stretch features attempted this unit. -->
 
