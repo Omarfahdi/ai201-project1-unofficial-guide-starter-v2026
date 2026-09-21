@@ -22,12 +22,28 @@ names a target of "4 of 5", and four of three is not a thing.
 """
 
 QUESTIONS = [
-    # {"question": "...", "expects": "..."},
-    {"question": "", "expects": ""},
-    {"question": "", "expects": ""},
-    {"question": "", "expects": ""},
-    {"question": "", "expects": ""},
-    {"question": "", "expects": ""},
+    # Five things a visitor would actually ask about these nine towns.
+    # Each has one right answer sitting in a labelled section of one guide.
+    {
+        "question": "What time does the bakery in Kestrelford sell out?",
+        "expects": "11am",
+    },
+    {
+        "question": "By what time do the Halden Bay car parks fill up on a summer weekend?",
+        "expects": "10am",
+    },
+    {
+        "question": "Which town in the region is the easiest to get around with limited mobility?",
+        "expects": "Thornby Wells",
+    },
+    {
+        "question": "Where should I eat in Brightwater instead of the riverside strip?",
+        "expects": "Corry Lane",
+    },
+    {
+        "question": "Where in the region can I still get a meal on a Sunday evening?",
+        "expects": "Marchwood",
+    },
 ]
 
 # Questions from a different world entirely. Your gate should refuse all five.
