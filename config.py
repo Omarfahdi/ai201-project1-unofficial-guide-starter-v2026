@@ -49,10 +49,13 @@ TOP_K = 5               # how many chunks to pull back per question
 #
 # LOWER IS BETTER: 0.3 is a close match, 0.9 is unrelated.
 #
-# 0.6 is a reasonable starting point, not a right answer. Milestone 4 has you
-# measure your own two groups of distances and put the cutoff in the gap.
-# Most corpora land somewhere between 0.45 and 0.75.
-THRESHOLD = 0.6
+# Milestone 4, measured on city_guides with my own chunker:
+#   in corpus     0.232  0.285  0.341  0.436  0.502
+#   out of corpus 0.810  0.835  0.861  0.881  0.969
+# A gap of 0.308 between the two groups, and 0.65 sits near the middle of it:
+# 0.15 of headroom above my worst real question and 0.16 below the closest
+# out-of-corpus one. See README.md → Sample Answer for the full table.
+THRESHOLD = 0.65
 
 
 # ─── Models ──────────────────────────────────────────────────────────────────

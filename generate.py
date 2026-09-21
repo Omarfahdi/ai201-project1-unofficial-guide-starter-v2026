@@ -273,13 +273,24 @@ def generate(prompt: str, system: str | None = None, cache: bool = True) -> str:
 
 # ─── The grounded answer ─────────────────────────────────────────────────────
 
+# Tightened in Milestone 4. The starter's version is the first six lines; the
+# last three are mine, and they exist because of what this corpus looks like.
+# Nine of the fourteen guides have a section called "Eat and drink" and the
+# towns repeat each other's facts, so five retrieved excerpts often say similar
+# things about different places. The failure that produces is not an ungrounded
+# answer — it is a real fact filed under the wrong town or the wrong filename,
+# which reads as perfectly confident. Criterion 5 is the check for that, and
+# these three lines are the instruction that tries to prevent it.
 GROUNDING_INSTRUCTION = """You answer questions using only the documents provided to you.
 
 Rules:
 - Use only the information in the documents below. Do not use anything you know from elsewhere.
 - If the documents don't cover the question, say you don't have enough information. Do not guess.
 - Name the document your answer came from, using the filename given in each excerpt.
-- Be brief. Two or three sentences is usually enough."""
+- Be brief. Two or three sentences is usually enough.
+- Only name filenames that appear in an excerpt above. Never name a file you were not given.
+- Each excerpt begins with the place and section it came from. Keep facts attached to the place they were written about; do not carry a detail from one town over to another.
+- If the excerpts disagree, say so and name both files rather than picking one."""
 
 
 def build_prompt(question: str, results) -> str:
