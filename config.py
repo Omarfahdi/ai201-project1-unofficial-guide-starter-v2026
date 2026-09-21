@@ -27,8 +27,17 @@ CORPUS = os.getenv("AI201_CORPUS", "city_guides")
 # These are deliberately plain, generic numbers. Milestone 3 is where you
 # replace them with numbers that fit the documents you actually read.
 
-CHUNK_SIZE = 800        # characters per chunk
-CHUNK_OVERLAP = 120     # characters shared between neighbouring chunks
+# Milestone 3: these are mine now, and they mean slightly different things
+# than they did for the starter's fixed windows. The chunker splits on the
+# `##` headings the city_guides documents already have, so a section is a
+# chunk. CHUNK_SIZE is the ceiling a section has to exceed before it gets
+# split further; CHUNK_OVERLAP is what gets carried forward when that happens;
+# CHUNK_MIN is the floor under which a section gets glued to its neighbour.
+# See README.md → Chunking Strategy for why these numbers and not others.
+
+CHUNK_SIZE = 900        # characters per chunk, as a ceiling
+CHUNK_OVERLAP = 150     # characters shared between neighbouring chunks
+CHUNK_MIN = 200         # sections shorter than this get merged into a neighbour
 
 
 # ─── Retrieval (Milestone 4) ─────────────────────────────────────────────────
