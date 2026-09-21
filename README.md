@@ -1,6 +1,6 @@
 # The Unofficial Guide
 
-Omarfahdi Abed — corpus: `city_guides`
+Omarfahdi Abed, corpus: `city_guides`
 
 ---
 
@@ -13,7 +13,7 @@ nine towns in one invented region, plus five guides that cut across all of them
 (eating, walking, regional transport, seasons, and getting around with limited
 mobility). You ask it a plain question and it answers from those documents
 only, naming the file the answer came from. It is built for the specific
-questions a visitor would actually ask — what time the Kestrelford bakery sells
+questions a visitor would actually ask: what time the Kestrelford bakery sells
 out, by when the Halden Bay car parks fill on a summer weekend, which town is
 easiest to get around with limited mobility, where to eat in Brightwater
 instead of the riverside strip. Ask it something the guides don't cover and a
@@ -22,15 +22,15 @@ doesn't have enough information instead of inventing an answer.
 
 ## Chunking Strategy
 
-**Chunk size:** 900 characters as a ceiling, not a target — the average chunk
+**Chunk size:** 900 characters as a ceiling, not a target. The average chunk
 comes out at 330 (shortest 206, longest 943)
 **Overlap:** 150 characters, carried across only when a section exceeds the
 ceiling
 
 These numbers come out of what the documents look like rather than the other
 way round. Every guide in this corpus is 1,400 to 2,500 characters and arrives
-already divided into labelled sections — `## Getting there`, `## Getting
-around`, `## Eat and drink`, `## What to see`, `## When to go` — that run
+already divided into labelled sections (`## Getting there`, `## Getting
+around`, `## Eat and drink`, `## What to see`, `## When to go`) that run
 roughly 200 to 690 characters each. The answer to a real question sits inside
 one of those sections: "by what time do the car parks fill" is one sentence in
 Halden Bay's "Getting there", and nothing in "What to see" helps with it.
@@ -52,14 +52,14 @@ Two things I noticed in my own documents drove this:
 
 2. **Nine of my fourteen guides have a section called "Eat and drink."** A
    chunk containing only the body of that section is indistinguishable from
-   eight others once it's a vector — "one pub, food served lunchtimes" could be
+   eight others once it's a vector, since "one pub, food served lunchtimes" could be
    any of nine towns. So every chunk now starts with its own header line,
    `Kestrelford — Eat and drink`, and the town name is part of what gets
    embedded and part of what the model is shown.
 
 **Where I changed my mind:** I set the overlap to 150 characters before
 checking whether it would ever be used, out of habit from the fixed-window
-version. It never fires on this corpus — the longest section body here is 691
+version. It never fires on this corpus, because the longest section body here is 691
 characters, so nothing reaches the 900 ceiling and `_split_long` returns its
 input untouched every time. I left the number and the code in, because the
 1,200-character upper bound in criterion 4 has to hold for any document and a
@@ -78,7 +78,7 @@ Result, before and after:
 
 Printed with `python app.py chunks -n 5`.
 
-**Chunk 1** — source: `guide_accessibility.md#0` — produced by: `chunker.py::split_documents`
+**Chunk 1** | source: `guide_accessibility.md#0` | produced by: `chunker.py::split_documents`
 
 ```
 Getting around the region with limited mobility — Overview
@@ -106,7 +106,7 @@ This one is a merge: the two-sentence opening of the document was under my
 200-character floor, so it got glued onto the section that follows it rather
 than being indexed as a fragment on its own.
 
-**Chunk 2** — source: `guide_corry_vale.md#6` — produced by: `chunker.py::split_documents`
+**Chunk 2** | source: `guide_corry_vale.md#6` | produced by: `chunker.py::split_documents`
 
 ```
 Corry Vale — When to go
@@ -114,7 +114,7 @@ Corry Vale — When to go
 May to September. Outside those months the pub in the third village closes, the farm shop reduces its hours, and several footpaths become genuinely boggy rather than merely wet. The road is not gritted above the second village and is impassable in snow.
 ```
 
-**Chunk 3** — source: `guide_givens_mill.md#3` — produced by: `chunker.py::split_documents`
+**Chunk 3** | source: `guide_givens_mill.md#3` | produced by: `chunker.py::split_documents`
 
 ```
 Givens Mill — Eat and drink
@@ -122,7 +122,7 @@ Givens Mill — Eat and drink
 A tearoom attached to the mill, open 10 to 4 daily except Tuesdays, which sells bread made from the flour ground twenty metres away and is the reason most people come. One pub, food served lunchtimes and Thursday to Saturday evenings.
 ```
 
-**Chunk 4** — source: `guide_kestrelford.md#6` — produced by: `chunker.py::split_documents`
+**Chunk 4** | source: `guide_kestrelford.md#6` | produced by: `chunker.py::split_documents`
 
 ```
 Kestrelford — When to go
@@ -130,7 +130,7 @@ Kestrelford — When to go
 Late spring and early autumn. The Saturday market runs year-round but is much reduced from November to February. August is busy with walkers. The single-track approach road is genuinely difficult in snow and the town can be cut off for a day or two most winters.
 ```
 
-**Chunk 5** — source: `guide_regional_transport.md#0` — produced by: `chunker.py::split_documents`
+**Chunk 5** | source: `guide_regional_transport.md#0` | produced by: `chunker.py::split_documents`
 
 ```
 Getting around the region — The railway
@@ -148,14 +148,14 @@ cards only.
 Chunks 2, 3 and 4 are each one whole section and answer a question on their
 own: when to visit Corry Vale, when the Givens Mill tearoom is open, whether
 Kestrelford is reachable in winter. Chunk 5 is a section that happens to hold
-two related facts — services and tickets — and both are about the same railway,
+two related facts, services and tickets, and both are about the same railway,
 so it still reads as one thought.
 
 ## Sample Answer
 
 **Question:** Where in the region can I still get a meal on a Sunday evening?
 
-This is the one my criterion 1 said would be hardest — it's the only test
+This is the one my criterion 1 said would be hardest. It is the only test
 question that doesn't name a town, and the answer is one sentence that exists
 in exactly one file. Complete output of `python app.py ask "..."`:
 
@@ -170,7 +170,7 @@ Sources retrieved: guide_corry_vale.md, guide_eating.md, guide_kestrelford.md
 1 model calls this session, 690 tokens (667 in, 23 out)
 ```
 
-The one file the answer names, `guide_eating.md`, is in the retrieved list —
+The one file the answer names, `guide_eating.md`, is in the retrieved list, and
 that is criterion 5 holding on this question. And the same command on a
 question the guides don't cover stops before the model runs at all:
 
@@ -209,11 +209,11 @@ an empty band 0.308 wide, and 0.65 sits near the middle of it: 0.15 of headroom
 above my worst real question and 0.16 below the nearest out-of-corpus one. At
 0.65 the gate lets through 5 of 5 real questions and refuses 5 of 5 fake ones.
 
-The gap is this clean because of what the corpus is — fourteen guides about one
+The gap is this clean because of what the corpus is: fourteen guides about one
 invented region, with no medicine, no sport, no cars and no code anywhere in
 them. The question I expected to be tight was the ibuprofen one, since
 `guide_accessibility.md` talks about hospitals and minor injuries units, and it
-did land closest of the five at 0.835 — but that is still 0.19 clear of the
+did land closest of the five at 0.835, but that is still 0.19 clear of the
 cutoff.
 
 I left `TOP_K` at 5. The answer was the top result for four of my five
@@ -223,11 +223,11 @@ sections from other towns.
 
 ## How I Used AI
 
-I used Claude as a coding assistant — for scaffolding, for the git commits, and for debugging — but I read every line before it went in, wrote a lot of the chunker myself, and kept the design decisions with me.
+I used Claude as a coding assistant, for scaffolding, for the git commits and for debugging, but I read every line before it went in, wrote a lot of the chunker myself, and kept the design decisions with me.
 
-**1.** I asked it what the starter's 800-character windows were doing to documents shaped like these, and it came back with the baseline (51 chunks, shortest 24 characters) plus one thing I'd missed: nine of my fourteen guides have a section headed "Eat and drink", so that section's body alone never says which town it belongs to. That changed my plan — I added the `Town — Heading` line to the top of every chunk so the town name gets embedded too.
+**1.** I asked it what the starter's 800-character windows were doing to documents shaped like mine. It gave me the baseline (51 chunks, shortest 24 characters) plus something I had missed: nine of my fourteen guides have a section headed "Eat and drink", so that section's text on its own never says which town it is about. That is why every chunk now carries its town and heading on the first line.
 
-**2.** I gave it my three rules (split on `##`, merge under 200, cap at 1,200) and had it draft `split_documents`. The code was right but its docstring claimed three sections were long enough to need splitting; I checked and the real number is zero — the longest section here is 691 characters, so my 150-character overlap never fires at all. I fixed the comment rather than the code and put the finding in Chunking Strategy above, since an overlap that does nothing is worth knowing before I start tuning numbers in unit 2.
+**2.** I gave it my three rules (split on `##`, merge under 200, cap at 1,200) and had it draft `split_documents`. The code was fine, but its comment claimed three sections were long enough to need splitting. I checked, and the real number is zero: the longest section here is 691 characters, so my 150-character overlap never fires at all, which is worth knowing before I start tuning numbers in unit 2.
 
 <!-- No stretch features attempted this unit. -->
 
