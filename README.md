@@ -1,19 +1,6 @@
 # The Unofficial Guide
 
-<!-- Replace this line with your name and which corpus you picked. -->
-
-> **This file is your submission.** Fill it in as you go — most sections get
-> written during the milestone that produces them, not at the end.
->
-> How the starter works, and every command you'll need, is in `RUNNING.md`.
-> Leave that file alone.
->
-> **Paste everything as text.** No screenshots, no video. A typed table gets
-> full credit; a picture of the same table gets none.
->
-> Delete these instruction blocks as you replace them. The `<!-- -->` comments
-> are notes to you and don't show up when the page renders — you can leave them
-> or remove them.
+Omarfahdi Abed — corpus: `city_guides`
 
 ---
 
@@ -21,109 +8,247 @@
 
 ## What This Does
 
-<!-- Three or four sentences. Which corpus you picked, and the kinds of
-     questions your system answers. Write it for someone who has never seen
-     this repo.
-
-     Milestone 5. -->
+This is a retrieval system over `city_guides`: fourteen travel guides covering
+nine towns in one invented region, plus five guides that cut across all of them
+(eating, walking, regional transport, seasons, and getting around with limited
+mobility). You ask it a plain question and it answers from those documents
+only, naming the file the answer came from. It is built for the specific
+questions a visitor would actually ask — what time the Kestrelford bakery sells
+out, by when the Halden Bay car parks fill on a summer weekend, which town is
+easiest to get around with limited mobility, where to eat in Brightwater
+instead of the riverside strip. Ask it something the guides don't cover and a
+relevance gate stops the question before the model ever sees it, and it says it
+doesn't have enough information instead of inventing an answer.
 
 ## Chunking Strategy
 
-**Chunk size:**
-**Overlap:**
+**Chunk size:** 900 characters as a ceiling, not a target — the average chunk
+comes out at 330 (shortest 206, longest 943)
+**Overlap:** 150 characters, carried across only when a section exceeds the
+ceiling
 
-<!-- What about YOUR documents made you pick these numbers? Short posts and
-     long sectioned guides don't want the same chunking, and "800 seemed
-     reasonable" earns nothing. Point at something you noticed when you read
-     the documents in Milestone 1.
+These numbers come out of what the documents look like rather than the other
+way round. Every guide in this corpus is 1,400 to 2,500 characters and arrives
+already divided into labelled sections — `## Getting there`, `## Getting
+around`, `## Eat and drink`, `## What to see`, `## When to go` — that run
+roughly 200 to 690 characters each. The answer to a real question sits inside
+one of those sections: "by what time do the car parks fill" is one sentence in
+Halden Bay's "Getting there", and nothing in "What to see" helps with it.
 
-     If you changed your mind partway through, say so and say why. That's worth
-     more than pretending you got it right first time.
+So the chunk is the section, not a character count. `split_documents` in
+`chunker.py` splits on the `##` headings, and the size settings only handle the
+two edge cases: a section over 900 characters gets split further at sentence
+boundaries with 150 characters carried into the next piece, and a section under
+200 characters gets merged into its neighbour instead of standing alone.
 
-     Milestone 3. -->
+Two things I noticed in my own documents drove this:
+
+1. **The starter's 800-character windows left a 24-character chunk.** Indexing
+   `city_guides` with `fallback_split` reported *51 chunks, 650 characters on
+   average (shortest 24, longest 800)*. That 24-character chunk is the tail of
+   a document that didn't divide evenly into 800s. It is a fragment that can
+   only ever be noise in a result list, and it is where the 200-character floor
+   in criterion 4 came from.
+
+2. **Nine of my fourteen guides have a section called "Eat and drink."** A
+   chunk containing only the body of that section is indistinguishable from
+   eight others once it's a vector — "one pub, food served lunchtimes" could be
+   any of nine towns. So every chunk now starts with its own header line,
+   `Kestrelford — Eat and drink`, and the town name is part of what gets
+   embedded and part of what the model is shown.
+
+**Where I changed my mind:** I set the overlap to 150 characters before
+checking whether it would ever be used, out of habit from the fixed-window
+version. It never fires on this corpus — the longest section body here is 691
+characters, so nothing reaches the 900 ceiling and `_split_long` returns its
+input untouched every time. I left the number and the code in, because the
+1,200-character upper bound in criterion 4 has to hold for any document and a
+guide with one long unbroken section would otherwise break it, but on
+`city_guides` specifically my overlap is doing nothing at all. That seemed
+worth writing down rather than quietly implying the number mattered.
+
+Result, before and after:
+
+| | Chunks | Average | Shortest | Longest | Function |
+|---|---|---|---|---|---|
+| Starter | 51 | 650 | 24 | 800 | `chunker.py::fallback_split` |
+| Mine | 91 | 330 | 206 | 943 | `chunker.py::split_documents` |
 
 ## Sample Chunks
 
-<!-- Five chunks, pasted as text. Label each one and name the file it came from
-     AND the function that produced it — the grader checks your code against
-     what you claim here.
+Printed with `python app.py chunks -n 5`.
 
-     `python app.py chunks -n 5` prints all three for you. Copy them straight
-     across.
-
-     Milestone 3. -->
-
-**Chunk 1** — source: `` — produced by: ``
+**Chunk 1** — source: `guide_accessibility.md#0` — produced by: `chunker.py::split_documents`
 
 ```
+Getting around the region with limited mobility — Overview
+
+An honest assessment rather than a promotional one. Some of these places are
+difficult and it is better to know in advance.
+
+Getting around the region with limited mobility — Straightforward
+
+**Thornby Wells** is the easiest town in the region. It is flat, compact, and
+everything is within three minutes of everything else. Parking is free for two
+hours anywhere in town and the station is central. The pump room and gardens
+are level throughout.
+
+**Marchwood** has a modern tram network with level boarding on all four lines,
+running every 8 minutes on weekdays. The city museum and covered market are both
+step-free. The distances between districts are the main consideration.
+
+**Brightwater** is level along the river and through the centre. The mill museum
+is step-free. The station is a 15-minute walk from campus on flat ground, or the
+shuttle meets the four busiest arrivals.
 ```
 
-**Chunk 2** — source: `` — produced by: ``
+This one is a merge: the two-sentence opening of the document was under my
+200-character floor, so it got glued onto the section that follows it rather
+than being indexed as a fragment on its own.
+
+**Chunk 2** — source: `guide_corry_vale.md#6` — produced by: `chunker.py::split_documents`
 
 ```
+Corry Vale — When to go
+
+May to September. Outside those months the pub in the third village closes, the farm shop reduces its hours, and several footpaths become genuinely boggy rather than merely wet. The road is not gritted above the second village and is impassable in snow.
 ```
 
-**Chunk 3** — source: `` — produced by: ``
+**Chunk 3** — source: `guide_givens_mill.md#3` — produced by: `chunker.py::split_documents`
 
 ```
+Givens Mill — Eat and drink
+
+A tearoom attached to the mill, open 10 to 4 daily except Tuesdays, which sells bread made from the flour ground twenty metres away and is the reason most people come. One pub, food served lunchtimes and Thursday to Saturday evenings.
 ```
 
-**Chunk 4** — source: `` — produced by: ``
+**Chunk 4** — source: `guide_kestrelford.md#6` — produced by: `chunker.py::split_documents`
 
 ```
+Kestrelford — When to go
+
+Late spring and early autumn. The Saturday market runs year-round but is much reduced from November to February. August is busy with walkers. The single-track approach road is genuinely difficult in snow and the town can be cut off for a day or two most winters.
 ```
 
-**Chunk 5** — source: `` — produced by: ``
+**Chunk 5** — source: `guide_regional_transport.md#0` — produced by: `chunker.py::split_documents`
 
 ```
+Getting around the region — The railway
+
+The line runs along the river valley, connecting Brightwater to the regional
+hub in 50 minutes. Eleven services a day on weekdays, six on Sundays. The line
+north of Brightwater closed in 1963 and everything beyond it is bus or car.
+
+Tickets are cheaper booked the day before than on the day, and considerably
+cheaper than that booked a week ahead. There is no ticket office at
+Brightwater station outside weekday mornings; the machine on the platform takes
+cards only.
 ```
+
+Chunks 2, 3 and 4 are each one whole section and answer a question on their
+own: when to visit Corry Vale, when the Givens Mill tearoom is open, whether
+Kestrelford is reachable in winter. Chunk 5 is a section that happens to hold
+two related facts — services and tickets — and both are about the same railway,
+so it still reads as one thought.
 
 ## Sample Answer
 
-<!-- One complete question and answer, pasted as text, with the source line
-     visible. Milestone 4. -->
+**Question:** Where in the region can I still get a meal on a Sunday evening?
 
-**Question:**
-
-**Answer:**
+This is the one my criterion 1 said would be hardest — it's the only test
+question that doesn't name a town, and the answer is one sentence that exists
+in exactly one file. Complete output of `python app.py ask "..."`:
 
 ```
+$ python app.py ask "Where in the region can I still get a meal on a Sunday evening?"
+  (best distance 0.436, cutoff 0.65)
+
+According to `guide_eating.md`, Sunday evening meals can be found in Marchwood and Thornby Wells.
+
+Sources retrieved: guide_corry_vale.md, guide_eating.md, guide_kestrelford.md
+
+1 model calls this session, 690 tokens (667 in, 23 out)
 ```
 
-**My relevance cutoff:**
+The one file the answer names, `guide_eating.md`, is in the retrieved list —
+that is criterion 5 holding on this question. And the same command on a
+question the guides don't cover stops before the model runs at all:
 
-<!-- The number you set in config.py, and how you got there.
+```
+$ python app.py ask "is the housing lottery random?"
+  (best distance 0.800, cutoff 0.65)
 
-     You ran five questions your corpus covers and the five in OUT_OF_SCOPE
-     that it clearly doesn't, and wrote down the best distance for each. What
-     did those two groups look like? Where was the gap? Put the actual numbers
-     here — the table below wants all ten rows.
+I don't have enough information about that.
 
-     Milestone 4. -->
+0 model calls this session
+```
+
+Zero model calls on that one. The gate refused it, so nothing was ever sent.
+
+**My relevance cutoff:** `THRESHOLD = 0.65` in `config.py`
+
+I ran all five of my test questions and all five of the `OUT_OF_SCOPE`
+questions through `python app.py retrieve "..."` and wrote down the best
+distance for each. The two groups don't overlap and they aren't close:
 
 | Question | In corpus? | Best distance |
 |---|---|---|
-|  |  |  |
+| Where should I eat in Brightwater instead of the riverside strip? | Yes | 0.232 |
+| By what time do the Halden Bay car parks fill up on a summer weekend? | Yes | 0.285 |
+| What time does the bakery in Kestrelford sell out? | Yes | 0.341 |
+| Where in the region can I still get a meal on a Sunday evening? | Yes | 0.436 |
+| Which town in the region is the easiest to get around with limited mobility? | Yes | 0.502 |
+| What is the capital of Mongolia? | No | 0.810 |
+| What is the recommended dosage of ibuprofen for a headache? | No | 0.835 |
+| How do I write a for loop in Rust? | No | 0.861 |
+| How do I change the oil in a diesel engine? | No | 0.881 |
+| Who won the 1994 World Cup? | No | 0.969 |
+
+In-corpus runs 0.232 to 0.502. Out-of-corpus runs 0.810 to 0.969. That leaves
+an empty band 0.308 wide, and 0.65 sits near the middle of it: 0.15 of headroom
+above my worst real question and 0.16 below the nearest out-of-corpus one. At
+0.65 the gate lets through 5 of 5 real questions and refuses 5 of 5 fake ones.
+
+The gap is this clean because of what the corpus is — fourteen guides about one
+invented region, with no medicine, no sport, no cars and no code anywhere in
+them. The question I expected to be tight was the ibuprofen one, since
+`guide_accessibility.md` talks about hospitals and minor injuries units, and it
+did land closest of the five at 0.835 — but that is still 0.19 clear of the
+cutoff.
+
+I left `TOP_K` at 5. The answer was the top result for four of my five
+questions and the top two for the fifth, so fewer would put the accessibility
+question at risk, and more would only pull in near-identical "Eat and drink"
+sections from other towns.
 
 ## How I Used AI
 
-<!-- Two specific moments. For each: what you asked for, what came back, and
-     what you changed about it.
+**1. Reading the corpus before touching the chunker.** I asked Claude to read
+four of the guides (`guide_kestrelford.md`, `guide_seasons.md`,
+`guide_regional_transport.md`, `guide_eating.md`) and tell me what the
+starter's 800-character windows were doing to documents shaped like that. What
+came back was the baseline line — 51 chunks from 14 documents, shortest 24
+characters — and one thing I had not spotted: nine of the fourteen guides have
+a section headed "Eat and drink", so the body of that section on its own
+doesn't say which town it belongs to. I changed my plan because of that. The
+chunker I'd sketched just split on `##` and kept the body; the version I
+actually wrote puts `Town — Heading` on the first line of every chunk, so the
+town name gets embedded along with the text.
 
-     "I asked Claude to write the chunking function from my notes. It ignored
-     the overlap, so I added that myself" is the level of detail we're after.
-     "I used AI to help me code" is not.
+**2. Writing the section splitter, then checking its claims.** I gave Claude my
+three rules — split on `##`, merge anything under 200 characters into its
+neighbour, cap a chunk at 1,200 — and asked it to write `split_documents`. The
+code was right, but its docstring asserted that "only three sections in
+city_guides are long enough" to need splitting at the 900-character ceiling. I
+checked that instead of believing it, and the real number is zero: the longest
+section body in this corpus is 691 characters, so `_split_long` never fires and
+my 150-character overlap does nothing here at all. I fixed the comment rather
+than the code — the ceiling still has to hold for criterion 4 — and the finding
+went into the Chunking Strategy section above, because an overlap that never
+runs is worth knowing about before unit 2, when I'd otherwise be tuning a
+number that has no effect.
 
-     Milestone 5. -->
-
-**1.**
-
-**2.**
-
-<!-- ── Stretch features ─────────────────────────────────────────────────────
-     Doing one? Say so here BEFORE you start. A feature this README never
-     claims earns nothing.
-     ───────────────────────────────────────────────────────────────────────── -->
+<!-- No stretch features attempted this unit. -->
 
 ---
 
@@ -135,38 +260,15 @@
 
 ## Run Log — Before
 
-<!-- Your five criteria, three runs each. `python run_eval.py --label before`
-     runs the questions, puts the OUT_OF_SCOPE ones through the gate, and
-     writes it all into results/ for you. Targets come from criteria.md; the
-     verdict column is your call.
-
-     Criterion 3 is measured in one deterministic pass rather than three, so
-     the same number goes in all three run columns. That's correct, not lazy.
-
-     Milestone 1. -->
-
 | Criterion | Target | Run 1 | Run 2 | Run 3 | Verdict |
 |---|---|---|---|---|---|
 | 1. Retrieved chunk contains the answer | 4 of 5 |  |  |  |  |
 | 2. Every answer names a source | 5 of 5 |  |  |  |  |
 | 3. Gate stops out-of-corpus questions | 4 of 5 |  |  |  |  |
-| 4. | | | | | |
-| 5. | | | | | |
-
-<!-- Underneath, paste the REAL output for each criterion from one of your
-     runs — the actual text your system produced, not a description of it.
-     Name the file and function that produced it. -->
+| 4. Chunks 200–1,200 chars and carry their heading | all chunks | | | | |
+| 5. Answers only cite retrieved sources | 5 of 5 | | | | |
 
 ## Verdicts
-
-<!-- MET or MISSED for each of the five, against the target you wrote last
-     unit — not a new one. Plus a sentence on how you decided. That sentence
-     matters most where it was close.
-
-     If your target said 4 of 5 and your runs came out 4, 3, 4, that's a MISS.
-     The target has to hold, not show up occasionally.
-
-     Milestone 2. -->
 
 | # | Criterion | Verdict | How I decided |
 |---|---|---|---|
@@ -178,68 +280,24 @@
 
 ## Diagnoses
 
-<!-- For each miss: which stage caused it, and how. The stage alone isn't
-     enough — you need the mechanism.
-
-     Not a diagnosis: "Question 3 didn't work."
-     A diagnosis:     "Question 3 asks about laundry costs. The answer is in
-                       one sentence that got split across two chunks, so
-                       neither chunk on its own contains it."
-
-     The five stages: loading → chunking → embedding → retrieval → generation.
-
-     Look for a pattern. If three misses all ask about numbers, that's one
-     problem, not three.
-
-     Missed nothing? Say so, then say honestly whether your targets were set
-     low, and which one you'd tighten and to what.
-
-     Milestone 3. -->
-
 ## The Improvement
 
 **What I changed:**
 
 **Why I picked it:**
 
-<!-- Connect it to a specific diagnosis above in one sentence. If you can't,
-     you picked a fix because it sounded impressive. -->
-
 ### Run Log — After
-
-<!-- Same format, same five criteria, three runs each.
-     `python run_eval.py --label after` -->
 
 | Criterion | Target | Run 1 | Run 2 | Run 3 | Verdict |
 |---|---|---|---|---|---|
 | 1. Retrieved chunk contains the answer | 4 of 5 |  |  |  |  |
 | 2. Every answer names a source | 5 of 5 |  |  |  |  |
 | 3. Gate stops out-of-corpus questions | 4 of 5 |  |  |  |  |
-| 4. | | | | | |
-| 5. | | | | | |
+| 4. Chunks 200–1,200 chars and carry their heading | all chunks | | | | |
+| 5. Answers only cite retrieved sources | 5 of 5 | | | | |
 
 **Did it help?**
 
-<!-- Say plainly whether it did, and how you know. If it made things worse,
-     say that — a change that backfired, honestly reported, earns full credit
-     and is more interesting than one that worked. What matters is that you can
-     tell.
-
-     Milestone 4. -->
-
 ## What's Still Broken
 
-<!-- For each criterion still missed after your fix: what you'd do about it,
-     and why you stopped where you did.
-
-     "I ran out of time" is fine if it's true. Pretending nothing is left is
-     not.
-
-     Milestone 5. -->
-
 ## What I'd Do Differently
-
-<!-- Knowing what you know now — which of your five criteria would you write
-     differently, and why?
-
-     Milestone 5. -->
