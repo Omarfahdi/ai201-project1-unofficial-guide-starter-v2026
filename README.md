@@ -351,22 +351,85 @@ I do not have enough information to answer whether there is a cinema in Kestrelf
 
 ## The Improvement
 
-**What I changed:**
+**What I changed:** one rule in `GROUNDING_INSTRUCTION` in `generate.py` (commit "refusals are one fixed sentence in the grounding prompt"). The old rule said "If the documents don't cover the question, say you don't have enough information." The new version:
 
-**Why I picked it:**
+```
+- If the documents don't answer the question at all, reply with exactly this sentence and nothing else: I don't have enough information about that. A refusal names no file and adds no facts about other places.
+- If the documents answer only part of the question, give that part, name the file, and say what the documents don't cover.
+- When you do answer, name the document your answer came from, using the filename given in each excerpt.
+```
+
+Nothing else changed: same corpus, chunking, index, top-k, cutoff and model.
+
+**Why I picked it:** my diagnosis found two stages involved. The gate can't be fixed with a cutoff, because near-domain questions overlap my real questions' distances. So the fix had to go where the leak actually happened, which was generation: the citation rule firing on refusals. The partial-answer line is there so the Marchwood question keeps answering what the guide does say instead of being forced into a flat refusal.
 
 ### Run Log — After
 
+From `results/run_2026-09-27_1924_after.md`, `python run_eval.py --label after`, cache off, 15 model calls.
+
 | Criterion | Target | Run 1 | Run 2 | Run 3 | Verdict |
 |---|---|---|---|---|---|
-| 1. Retrieved chunk contains the answer | 4 of 5 |  |  |  |  |
-| 2. Every answer names a source | 5 of 5 |  |  |  |  |
-| 3. Gate stops out-of-corpus questions | 4 of 5 |  |  |  |  |
-| 4. Chunks 200–1,200 chars and carry their heading | all chunks | | | | |
-| 5. Answers only cite retrieved sources | 5 of 5 | | | | |
+| 1. Retrieved chunk contains the answer | 4 of 5 | 5/5 | 5/5 | 5/5 | MET |
+| 2. Every answer names a source | 5 of 5 | 5/5 | 5/5 | 5/5 | MET |
+| 3. Gate stops out-of-corpus questions | 4 of 5 | 5/5 | 5/5 | 5/5 | MET |
+| 4. Chunks 200–1,200 chars and carry their heading | all chunks | 91/91 | 91/91 | 91/91 | MET |
+| 5. Answers only cite retrieved sources | 5 of 5 | 5/5 | 5/5 | 5/5 | MET |
 
-**Did it help?**
+Criteria 1, 3 and 4 can't have moved, since the change only touches generation and the distances came out identical. Criteria 2 and 5 are the ones that could have regressed, and didn't. Real output, run 1 of the after file:
+
+```
+Kestrelford bakery: The bakery in Kestrelford sells out by 11am, according to `guide_kestrelford.md` and `guide_eating.md`.
+Halden Bay parking: On summer weekends, the Halden Bay car parks fill up by 10am, according to both `guide_halden_bay.md` and `guide_regional_transport.md` (and also mentioned in `guide_seasons.md`).
+Limited mobility: According to guide_accessibility.md, Thornby Wells is the easiest town in the region to get around with limited mobility because it is flat, compact, and everything is within three minutes of everything else.
+Brightwater eating: You should eat on Corry Lane, which is located two streets back from the riverside strip. Sources: `guide_brightwater.md` and `guide_eating.md`
+Sunday evening: According to guide_eating.md, Sunday evening is hardest to find anywhere except Marchwood and Thornby Wells.
+```
+
+### Near-domain probe, before and after
+
+From `tools/probe.py`, 3 runs each, cache off.
+
+| Measure | Before | After |
+|---|---|---|
+| Clean refusals (of 4 unanswerable) | 2/4, 2/4, 2/4 | 4/4, 4/4, 4/4 |
+| Marchwood partial answer, no invented price | 3/3 | 3/3 |
+| Output tokens for the 15 probe calls | 428 | 254 |
+
+Real output after the change (`results/probe_2026-09-27_1927_after.md`, run 1):
+
+```
+=== What time does the bakery in Pellew Sands sell out?
+I don't have enough information about that.
+
+=== Is there a cinema in Kestrelford?
+I don't have enough information about that.
+
+=== How much does a hotel room in Marchwood cost per night?
+According to guide_marchwood.md, hotel prices in Marchwood are cheap outside of conference weeks, but conference weeks in March and October double the prices. The documents do not state the exact monetary cost per night.
+```
+
+**Did it help?** Yes, on the thing it targeted, and without breaking anything. Clean refusals went from 2 of 4 to 4 of 4 on every run, and the two that leaked before (Pellew Sands and the cinema) now give only the refusal line. Marchwood got slightly better too: it still reports what the guide says, and now it also says the exact price isn't in the documents. The five original criteria held at 5/5 on every run, so the stricter prompt didn't start refusing real questions, which was the risk I was watching for on the Sunday and accessibility questions. A side effect I like: the model's refusal is now the same sentence the gate uses, so the user sees one consistent message whichever layer refused.
+
+I can't claim the five criteria improved, because they were already all met. The evidence that the change helped comes from the probe, which isn't one of my five criteria. That's a gap in the criteria, covered below.
 
 ## What's Still Broken
 
+Nothing is missed against my five criteria, before or after. What's still broken is what they didn't measure:
+
+- **The gate still lets near-domain questions through.** All five probe questions pass at 0.366 to 0.499, and every one costs a model call and relies on the model obeying the prompt. A cutoff can't fix this. What I'd try next is a second signal alongside distance, like a keyword check: "cinema" appears nowhere in the corpus, and BM25 would score it at zero even though the embedding calls it close. I stopped here because that's a second change, and this unit allows one.
+- **The probe is small and I wrote it.** Five questions, one corpus, and a string-match check for "clean". I also read every answer myself, but five questions I picked aren't strong evidence the fix generalizes.
+- **No scorer.py, and one `expects` value is incomplete.** Every verdict here was judged by hand. The Sunday `expects` is "Marchwood" when the source says "Marchwood and Thornby Wells", so a scorer built on it would pass a half-right answer.
+- **Citation formatting is inconsistent.** Filenames show up plain, in backticks, bold or italic depending on the run. It doesn't affect any criterion, so I left it.
+
 ## What I'd Do Differently
+
+- **Criterion 3** is the one I'd rewrite. Keep the five far-away questions, add five near-domain ones like my probe, and score what the whole system returns (gate refusal or a clean model refusal), with a target of at least 4 of 5 on each set. As written, it only tested whether the gate can tell travel from programming.
+- **Criterion 1** should have been 5 of 5. I hedged for the Sunday question and it ranked first every time.
+- **Criteria 2 and 5** were close to guaranteed by the pipeline. I'd keep one as a regression check and spend the other slot on refusal quality, which is where the real failure turned up.
+- I'd fix the Sunday `expects` to require both towns before building a scorer on it.
+
+## How I Used AI (Unit 2)
+
+I used Claude to get the project running on my Mac, to write the two measurement scripts (`tools/check_chunks.py` and `tools/probe.py`), and to handle the README edits and commits. The idea of probing with near-domain questions came from Claude after I pointed out that my out-of-scope questions were never close to the cutoff.
+
+The judgment calls I checked myself. Claude initially flagged the Marchwood answer's "cheap" as possibly invented; I grepped `guide_marchwood.md`, found "cheap" is in the source, and didn't count it as a leak. I also checked the Sunday answer's "Thornby Wells" against `guide_eating.md` before marking it correct, and read the after answers to confirm the stricter prompt hadn't started refusing real questions before calling the change a success.
