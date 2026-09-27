@@ -241,23 +241,72 @@ I used Claude as a coding assistant, for scaffolding, for the git commits and fo
 
 ## Run Log — Before
 
+From `results/run_2026-09-27_1900_before.md`, produced by `python run_eval.py --label before` (cache off, 15 model calls). There's no scorer.py, so I judged each answer by reading it against the `expects` value in `questions.py` and the source text.
+
 | Criterion | Target | Run 1 | Run 2 | Run 3 | Verdict |
 |---|---|---|---|---|---|
-| 1. Retrieved chunk contains the answer | 4 of 5 |  |  |  |  |
-| 2. Every answer names a source | 5 of 5 |  |  |  |  |
-| 3. Gate stops out-of-corpus questions | 4 of 5 |  |  |  |  |
-| 4. Chunks 200–1,200 chars and carry their heading | all chunks | | | | |
-| 5. Answers only cite retrieved sources | 5 of 5 | | | | |
+| 1. Retrieved chunk contains the answer | 4 of 5 | 5/5 | 5/5 | 5/5 | MET |
+| 2. Every answer names a source | 5 of 5 | 5/5 | 5/5 | 5/5 | MET |
+| 3. Gate stops out-of-corpus questions | 4 of 5 | 5/5 | 5/5 | 5/5 | MET |
+| 4. Chunks 200–1,200 chars and carry their heading | all chunks | 91/91 | 91/91 | 91/91 | MET |
+| 5. Answers only cite retrieved sources | 5 of 5 | 5/5 | 5/5 | 5/5 | MET |
+
+Criteria 1, 3 and 4 can't vary between runs. Retrieval is deterministic (every question had the same best distance on all three runs), the gate is a comparison against a fixed number, and chunking happens once at index time. So one number goes in all three columns. Criteria 2 and 5 depend on the generated text, which changed wording between runs but never changed the result.
+
+### Criterion 1: real output
+
+`python app.py retrieve "Where in the region can I still get a meal on a Sunday evening?"` (`app.py`, retrieve command):
+
+```
+#   distance   source                           preview
+1   0.4355     guide_eating.md                  Eating across the region — Opening hours  This catch...
+2   0.4634     guide_eating.md                  Eating across the region — Local specifics  Halden B...
+3   0.4812     guide_kestrelford.md             Kestrelford — Eat and drink  Four pubs, two cafés, a...
+4   0.4927     guide_corry_vale.md              Corry Vale — Eat and drink  One pub in the largest v...
+5   0.5186     guide_eating.md                  Eating across the region — Practical  Cash is still ...
+```
+
+The top chunk holds the answer sentence from `guide_eating.md`: "Sunday evening is the hardest meal to find anywhere except Marchwood and Thornby Wells."
+
+### Criteria 2 and 5: real output (run 1, `run_eval.py`)
+
+| Question | Sources retrieved | Answer |
+|---|---|---|
+| Kestrelford bakery | guide_eating.md, guide_kestrelford.md | The bakery in Kestrelford sells out by 11am (according to guide_kestrelford.md and guide_eating.md). |
+| Halden Bay parking | guide_halden_bay.md, guide_regional_transport.md, guide_seasons.md | On summer weekends, the Halden Bay car parks fill up by 10am, as stated in *guide_halden_bay.md* and *guide_regional_transport.md* (and additionally mentioned in *guide_seasons.md*). |
+| Limited mobility | guide_accessibility.md, guide_corry_vale.md, guide_walking.md | According to **guide_accessibility.md**, Thornby Wells is the easiest town in the region to get around with limited mobility because it is flat, compact, and everything is within three minutes of everything else. |
+| Brightwater eating | guide_brightwater.md, guide_eating.md, guide_regional_transport.md | You should eat on Corry Lane, which is located two streets back (or inland) from the riverside strip (*guide_brightwater.md* and *guide_eating.md*). |
+| Sunday evening | guide_corry_vale.md, guide_eating.md, guide_kestrelford.md | You can still find a meal on a Sunday evening in Marchwood and Thornby Wells, according to guide_eating.md. |
+
+### Criterion 3: real output (`run_eval.py::check_out_of_scope`, cutoff 0.65)
+
+| Out-of-scope question | Best distance | Gate |
+|---|---|---|
+| What is the capital of Mongolia? | 0.810 | refused |
+| How do I change the oil in a diesel engine? | 0.881 | refused |
+| Who won the 1994 World Cup? | 0.969 | refused |
+| What is the recommended dosage of ibuprofen for a headache? | 0.835 | refused |
+| How do I write a for loop in Rust? | 0.861 | refused |
+
+### Criterion 4: real output (`tools/check_chunks.py`, chunks from `chunker.py::split_documents`)
+
+```
+city_guides__default: 91 chunks, min 206, max 943
+  outside 200-1200: 0 []
+  first line missing 'Guide — Section': 0 []
+```
 
 ## Verdicts
 
 | # | Criterion | Verdict | How I decided |
 |---|---|---|---|
-| 1 |  |  |  |
-| 2 |  |  |  |
-| 3 |  |  |  |
-| 4 |  |  |  |
-| 5 |  |  |  |
+| 1 | Retrieved chunk contains the answer (4 of 5) | MET | 5/5 on every run. The Sunday question, which I flagged as risky because it names no town, still ranked the right chunk (Opening hours in `guide_eating.md`) first at 0.436. The other four answers sit in chunks I read directly. |
+| 2 | Every answer names a source (5 of 5) | MET | All 15 answers named at least one file. Not close. |
+| 3 | Gate stops out-of-corpus questions (4 of 5) | MET | 5 of 5 refused. Closest was Mongolia at 0.810, 0.16 above the cutoff. Ibuprofen, which I expected to be the risky one, came in at 0.835. |
+| 4 | Chunks 200 to 1,200 chars with heading (all) | MET | All 91 chunks are 206 to 943 characters and start with guide and section. I revised how this is measured (see criteria.md) because the command I named only showed 40 of 91 chunks and no lengths. The target didn't change. |
+| 5 | Answers only cite retrieved sources (5 of 5) | MET | I checked every filename in all 15 answers against that question's Sources list. No stray citations. Closest call: Halden Bay run 2 cited `guide_seasons.md` for a slightly different fact ("arriving before 10am in August"). It was retrieved so it passes, but it's the model blending near-duplicate sources, which is what this criterion was written to catch. |
+
+One note on judging by hand: my `expects` for the Sunday question was "Marchwood", but the source says "Marchwood and Thornby Wells". All 15 answers gave both, so they're correct, but a keyword scorer using my `expects` value would also pass an answer that dropped Thornby Wells.
 
 ## Diagnoses
 

@@ -89,6 +89,14 @@ guide can never collapse into one chunk. The heading has to be inside the chunk
 text because nine of my fourteen documents have a section called "Eat and
 drink" — without its title, a chunk is indistinguishable from eight others.
 
+> **Revised in unit 2:** Same target (every chunk 200 to 1,200 characters, first
+> line names the guide and the section), but checked over every chunk in the
+> index with `python tools/check_chunks.py` instead of `python app.py chunks -n 40`.
+>
+> **Why revised:** The command I named prints only 40 of the 91 chunks and doesn't
+> print lengths, so it couldn't verify "every chunk". The target is unchanged; only
+> the way it's measured changed.
+
 ---
 
 ## 5. Answers only cite sources that were actually retrieved
