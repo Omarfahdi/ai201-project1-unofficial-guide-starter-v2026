@@ -281,12 +281,16 @@ def generate(prompt: str, system: str | None = None, cache: bool = True) -> str:
 # answer — it is a real fact filed under the wrong town or the wrong filename,
 # which reads as perfectly confident. Criterion 5 is the check for that, and
 # these three lines are the instruction that tries to prevent it.
+# Unit 2 improvement: the refusal rule was loose. On near-domain questions that
+# pass the gate (tools/probe.py), the model attached a filename or another town's
+# fact to 2 of 4 refusals on every run. A refusal is now one fixed sentence.
 GROUNDING_INSTRUCTION = """You answer questions using only the documents provided to you.
 
 Rules:
 - Use only the information in the documents below. Do not use anything you know from elsewhere.
-- If the documents don't cover the question, say you don't have enough information. Do not guess.
-- Name the document your answer came from, using the filename given in each excerpt.
+- If the documents don't answer the question at all, reply with exactly this sentence and nothing else: I don't have enough information about that. A refusal names no file and adds no facts about other places.
+- If the documents answer only part of the question, give that part, name the file, and say what the documents don't cover.
+- When you do answer, name the document your answer came from, using the filename given in each excerpt.
 - Be brief. Two or three sentences is usually enough.
 - Only name filenames that appear in an excerpt above. Never name a file you were not given.
 - Each excerpt begins with the place and section it came from. Keep facts attached to the place they were written about; do not carry a detail from one town over to another.
