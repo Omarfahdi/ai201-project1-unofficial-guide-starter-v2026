@@ -310,6 +310,45 @@ One note on judging by hand: my `expects` for the Sunday question was "Marchwood
 
 ## Diagnoses
 
+No criterion missed, so there's nothing to diagnose in the strict sense. The honest reading is that my targets were safe:
+
+- **Criteria 2 and 5** were close to guaranteed. I said as much in criteria.md: the filename is on every excerpt and the prompt tells the model to use it. They guard against a regression; they don't test anything hard.
+- **Criterion 1** hedged at 4 of 5 for the Sunday question, which then ranked first on every run. It should have been 5 of 5.
+- **Criterion 3** is the weak one. Mongolia, diesel engines, the World Cup, ibuprofen and Rust share no vocabulary with a travel guide, so the closest landed at 0.810. They tested whether the gate can tell travel from programming, not whether it can tell an answerable travel question from an unanswerable one.
+
+### Probing what criterion 3 didn't test
+
+So I asked five questions that sound like my corpus but that it doesn't answer. Best distances from `python app.py retrieve "..."`:
+
+| Near-domain question (not answered by the corpus) | Best distance | Gate |
+|---|---|---|
+| Is there a cinema in Kestrelford? | 0.366 | passed |
+| What is the best vegan restaurant in Halden Bay? | 0.407 | passed |
+| How much is a taxi from Brightwater station to Elder Ness? | 0.408 | passed |
+| How much does a hotel room in Marchwood cost per night? | 0.490 | passed |
+| What time does the bakery in Pellew Sands sell out? | 0.499 | passed |
+
+**Stage: retrieval (the relevance gate in `gate.py`).** Cosine distance measures whether a question shares topic and vocabulary with a chunk (a town name, "bakery", "restaurant"), not whether the chunk contains an answer. These five land between 0.366 and 0.499, inside my real questions' range of 0.232 to 0.502. "Is there a cinema in Kestrelford?" is closer than my real Sunday question (0.436), and the Pellew Sands question is closer than my real accessibility question (0.502). No cutoff separates them: anything below 0.499 starts refusing real questions. The gate can't fix this, so for these questions the grounding prompt is the only guard.
+
+To see how well it guards, `tools/probe.py` asked each question three times with the cache off (`results/probe_2026-09-27_1920_before.md`). The Marchwood question is partly answerable (the guide says hotels are "cheap" outside conference weeks but gives no price), so it's scored on whether it invents a price. The other four should be plain refusals.
+
+- Clean refusals: run 1 2/4, run 2 2/4, run 3 2/4
+- Marchwood with no invented price: 3/3
+
+The same two leaked every run. Real output from `python app.py ask` (`generate.py::answer_from_chunks`):
+
+```
+=== What time does the bakery in Pellew Sands sell out?
+I do not have enough information to answer what time the bakery in Pellew Sands sells out, as the provided documents only mention that Kestrelford's bakery sells out by 11am (guide_eating.md).
+
+=== Is there a cinema in Kestrelford?
+I do not have enough information to answer whether there is a cinema in Kestrelford (guide_kestrelford.md).
+```
+
+**Stage: generation (`GROUNDING_INSTRUCTION` in `generate.py`).** The refusal rule is loose ("say you don't have enough information") and sits right next to "Name the document your answer came from". The model treats a refusal as an answer that still needs a source. On Pellew Sands it refuses, then offers the Kestrelford bakery time from `guide_eating.md` with a citation, which is exactly the "detail carried from one town to another" my last prompt rule was written to stop. On the cinema question it cites `guide_kestrelford.md` for a refusal, as if the file said there's no cinema. Nothing was invented, but both leaks are the same pattern: the citation rule firing on a refusal.
+
+**Criterion I'd tighten:** criterion 3 should include near-domain questions like these five, scored on the full system's response (gate or model), not just the gate.
+
 ## The Improvement
 
 **What I changed:**
